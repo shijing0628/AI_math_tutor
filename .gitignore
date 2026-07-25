@@ -22,10 +22,6 @@ logs.txt
 chat_history.json
 student_profile.json
 
-# Large local assets (regenerate or keep locally)
-page_images/
-*.png
-
 # OS
 .DS_Store
 Thumbs.db
