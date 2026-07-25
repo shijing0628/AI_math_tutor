@@ -98,12 +98,13 @@ def clean_json(text: str):
 # ============================================================
 
 def get_api_key() -> str:
-    # Prefer sidebar override, then .env / process env
-    key = (
-        st.session_state.get("api_key")
-        or os.environ.get("AZURE_OPENAI_API_KEY")
-        or ""
-    ).strip()
+    # .env / process env first, then Streamlit Cloud secrets. Never shown in the UI.
+    key = (os.environ.get("AZURE_OPENAI_API_KEY") or "").strip()
+    if not key:
+        try:
+            key = str(st.secrets.get("AZURE_OPENAI_API_KEY", "")).strip()
+        except Exception:
+            key = ""
     if key in PLACEHOLDER_KEYS:
         return ""
     return key
@@ -113,8 +114,8 @@ def azure_config_error() -> str | None:
     if not get_api_key():
         return (
             "AZURE_OPENAI_API_KEY is not set. "
-            f"Edit `{ENV_FILE}` and paste your real key, then restart Streamlit "
-            "(or paste the key in the sidebar)."
+            f"Locally: edit `{ENV_FILE}` and restart Streamlit. "
+            "On Streamlit Cloud: add it under App settings → Secrets."
         )
     if not AZURE_ENDPOINT:
         return f"AZURE_ENDPOINT is missing in `{ENV_FILE}`."
@@ -682,9 +683,6 @@ def init_session() -> None:
         st.session_state.graph_threads = {}
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = load_json(CHAT_HISTORY_FILE, {})
-    if "api_key" not in st.session_state:
-        env_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
-        st.session_state.api_key = "" if env_key in PLACEHOLDER_KEYS else env_key
     if "last_evaluation" not in st.session_state:
         st.session_state.last_evaluation = None
 
@@ -713,21 +711,11 @@ def main():
     # ---- Sidebar ----
     with st.sidebar:
         st.header("Setup")
-        st.caption(f"Config file: `{ENV_FILE.name}`")
-        key_input = st.text_input(
-            "Azure OpenAI API Key",
-            type="password",
-            value=st.session_state.api_key,
-            help="Paste your key here, or put it in the .env file as AZURE_OPENAI_API_KEY",
-        )
-        if key_input != st.session_state.api_key:
-            st.session_state.api_key = key_input
-
         cfg_err = azure_config_error()
         if cfg_err:
             st.error(cfg_err)
         else:
-            st.success("Azure config ready (.env)")
+            st.success("Azure config ready")
             st.caption(f"Model: {AZURE_MODEL}")
 
         st.divider()
