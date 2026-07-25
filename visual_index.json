@@ -1,0 +1,111 @@
+{
+  "Review of function notation and evaluating functions": [
+    "page_images/page_2.png",
+    "page_images/page_4.png",
+    "page_images/page_6.png"
+  ],
+  "Interpreting graphs, domain, and range": [
+    "page_images/page_4.png",
+    "page_images/page_26.png"
+  ],
+  "Linear equations, slope, and intercepts": [
+    "page_images/page_4.png",
+    "page_images/page_28.png"
+  ],
+  "Equations of lines from points and slopes": [
+    "page_images/page_4.png",
+    "page_images/page_26.png",
+    "page_images/page_27.png"
+  ],
+  "Quadratic functions and graphing parabolas": [
+    "page_images/page_4.png",
+    "page_images/page_15.png",
+    "page_images/page_27.png"
+  ],
+  "Completing the square and vertex form": [
+    "page_images/page_4.png"
+  ],
+  "Function transformations and symmetry": [
+    "page_images/page_5.png"
+  ],
+  "Absolute value functions and interval notation": [
+    "page_images/page_2.png",
+    "page_images/page_6.png",
+    "page_images/page_14.png"
+  ],
+  "Even and odd functions": [
+    "page_images/page_9.png",
+    "page_images/page_10.png",
+    "page_images/page_12.png"
+  ],
+  "Mathematical modelling with functions": [
+    "page_images/page_2.png",
+    "page_images/page_6.png",
+    "page_images/page_9.png"
+  ],
+  "Linear, quadratic, and exponential models": [
+    "page_images/page_18.png",
+    "page_images/page_15.png"
+  ],
+  "Using technology to graph and analyze functions": [
+    "page_images/page_4.png",
+    "page_images/page_23.png",
+    "page_images/page_27.png"
+  ],
+  "Introduction to polynomial functions": [
+    "page_images/page_2.png",
+    "page_images/page_8.png",
+    "page_images/page_38.png"
+  ],
+  "Characteristics of cubic and quartic functions": [
+    "page_images/page_18.png"
+  ],
+  "Finite differences and degree of polynomials": [
+    "page_images/page_38.png"
+  ],
+  "Polynomial operations and simplification": [
+    "page_images/page_2.png",
+    "page_images/page_8.png"
+  ],
+  "Synthetic division and long division of polynomials": [
+    "page_images/page_38.png",
+    "page_images/page_39.png"
+  ],
+  "Remainder theorem and factor theorem": [
+    "page_images/page_38.png"
+  ],
+  "Factoring higher-degree polynomials": [
+    "page_images/page_38.png",
+    "page_images/page_39.png"
+  ],
+  "Real and complex roots of polynomial equations": [
+    "page_images/page_38.png"
+  ],
+  "Graphing polynomial functions from factored form": [
+    "page_images/page_2.png",
+    "page_images/page_38.png"
+  ],
+  "Polynomial inequalities and sign analysis": [
+    "page_images/page_38.png",
+    "page_images/page_39.png"
+  ],
+  "Building polynomial models from graphs and zeros": [
+    "page_images/page_2.png",
+    "page_images/page_4.png"
+  ],
+  "Rates of change and average rate of change": [
+    "page_images/page_27.png",
+    "page_images/page_39.png"
+  ],
+  "Limits and continuity of functions": [
+    "page_images/page_27.png",
+    "page_images/page_39.png"
+  ],
+  "Introduction to derivatives and tangent lines": [
+    "page_images/page_27.png",
+    "page_images/page_39.png"
+  ],
+  "Applications of derivatives in optimization and modelling": [
+    "page_images/page_39.png"
+  ]
+}

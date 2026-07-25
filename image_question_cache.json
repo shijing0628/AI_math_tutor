@@ -1,0 +1,40 @@
+{
+  "Equations of lines from points and slopes": {
+    "question": "The graph below shows a straight line passing through the points A(-2, 5) and B(4, -1). Using the diagram, determine the equation of the line in slope-intercept form.",
+    "answer_key": "From the graph, the two points are A(-2, 5) and B(4, -1).\nSlope: m = (-1 - 5) / (4 - (-2)) = -6 / 6 = -1.\nUse y = mx + b.\nSubstitute point A(-2, 5):\n5 = -1(-2) + b\n5 = 2 + b\nb = 3.\nEquation of the line: y = -x + 3.",
+    "skills_tested": [
+      "Finding slope from two points on a graph",
+      "Determining the y-intercept",
+      "Writing equations of lines in slope-intercept form",
+      "Interpreting coordinate graphs"
+    ],
+    "page_reference": "Generated coordinate diagram for points A and B",
+    "diagram": {
+      "type": "line_points",
+      "points": [
+        [
+          -2,
+          5
+        ],
+        [
+          4,
+          -1
+        ]
+      ],
+      "labels": [
+        "A",
+        "B"
+      ],
+      "show_line": true,
+      "x_range": [
+        -6,
+        6
+      ],
+      "y_range": [
+        -4,
+        8
+      ],
+      "title": "Line through A(-2, 5) and B(4, -1)"
+    }
+  }
+}

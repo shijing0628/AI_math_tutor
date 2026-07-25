@@ -1,0 +1,110 @@
+[
+  {
+    "chapter": "Functions and Models",
+    "concept": "Review of function notation and evaluating functions"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Interpreting graphs, domain, and range"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Linear equations, slope, and intercepts"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Equations of lines from points and slopes"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Quadratic functions and graphing parabolas"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Completing the square and vertex form"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Function transformations and symmetry"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Absolute value functions and interval notation"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Even and odd functions"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Mathematical modelling with functions"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Linear, quadratic, and exponential models"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Using technology to graph and analyze functions"
+  },
+  {
+    "chapter": "Functions and Models",
+    "concept": "Introduction to polynomial functions"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Characteristics of cubic and quartic functions"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Finite differences and degree of polynomials"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Polynomial operations and simplification"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Synthetic division and long division of polynomials"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Remainder theorem and factor theorem"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Factoring higher-degree polynomials"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Real and complex roots of polynomial equations"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Graphing polynomial functions from factored form"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Polynomial inequalities and sign analysis"
+  },
+  {
+    "chapter": "Polynomials",
+    "concept": "Building polynomial models from graphs and zeros"
+  },
+  {
+    "chapter": "Calculus Foundations",
+    "concept": "Rates of change and average rate of change"
+  },
+  {
+    "chapter": "Calculus Foundations",
+    "concept": "Limits and continuity of functions"
+  },
+  {
+    "chapter": "Calculus Foundations",
+    "concept": "Introduction to derivatives and tangent lines"
+  },
+  {
+    "chapter": "Calculus Foundations",
+    "concept": "Applications of derivatives in optimization and modelling"
+  }
+]
