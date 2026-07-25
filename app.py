@@ -181,6 +181,40 @@ def call_llm_with_images(prompt: str, image_paths: list[str], system: str | None
     return response.choices[0].message.content or ""
 
 
+def call_llm_with_uploaded_images(
+    prompt: str,
+    uploaded_files: list,
+    system: str | None = None,
+) -> str:
+    """Vision call: send student-uploaded photos (Streamlit UploadedFile) with the prompt."""
+    err = azure_config_error()
+    if err:
+        return err
+
+    client = get_client()
+    content = [{"type": "text", "text": prompt}]
+    for uf in uploaded_files[:3]:
+        b64 = base64.b64encode(uf.getvalue()).decode("utf-8")
+        mime = uf.type or "image/png"
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{b64}"},
+            }
+        )
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": content})
+
+    response = client.chat.completions.create(
+        model=AZURE_MODEL,
+        messages=messages,
+    )
+    return response.choices[0].message.content or ""
+
+
 # ============================================================
 # Tutor Logic
 # ============================================================
@@ -1085,25 +1119,63 @@ Give brief feedback: what is correct, what to fix, and the worked solution.
                 st.markdown(img_q.get("answer_key") or "_No answer key yet._")
 
             vis_ans = st.text_area(
-                "Your answer to the visual question",
+                "Your answer to the visual question (you can also upload a photo below)",
                 height=140,
                 key=f"vis_ans_{concept}",
             )
+
+            st.markdown("##### Or upload a photo of your handwritten work / sketch")
+            uploaded_photos = st.file_uploader(
+                "Take a picture of your work on paper and upload it (JPG/PNG, up to 3)",
+                type=["png", "jpg", "jpeg", "webp"],
+                accept_multiple_files=True,
+                key=f"vis_photo_{concept}",
+            )
+            use_camera = st.toggle("Use camera instead", key=f"vis_cam_toggle_{concept}")
+            camera_photo = None
+            if use_camera:
+                camera_photo = st.camera_input(
+                    "Take a photo of your work",
+                    key=f"vis_cam_{concept}",
+                )
+
+            photos = list(uploaded_photos or [])
+            if camera_photo is not None:
+                photos.append(camera_photo)
+            if photos:
+                cols = st.columns(min(len(photos), 3))
+                for i, ph in enumerate(photos[:3]):
+                    with cols[i % len(cols)]:
+                        st.image(ph, caption=f"Your work {i + 1}", use_container_width=True)
+
             if st.button("Check visual answer"):
-                if not vis_ans.strip():
-                    st.warning("Write your answer first.")
+                if not vis_ans.strip() and not photos:
+                    st.warning("Write your answer or upload a photo of your work first.")
                 else:
-                    with st.spinner("Checking..."):
-                        check = call_llm(
-                            f"""Concept: {concept}
+                    grade_prompt = f"""Concept: {concept}
 Visual question: {img_q.get('question')}
 Answer key: {img_q.get('answer_key')}
-Student answer: {vis_ans}
+Student typed answer (may be empty if they uploaded a photo): {vis_ans}
 
 Give supportive feedback and a short worked solution. Score out of 10.
-""",
-                            system="You are a Grade 12 math teacher.",
-                        )
+"""
+                    with st.spinner("Checking..."):
+                        if photos:
+                            check = call_llm_with_uploaded_images(
+                                grade_prompt
+                                + "\nThe student also attached photo(s) of their handwritten "
+                                "work or graph sketch. Read the handwriting/sketch carefully, "
+                                "grade based on BOTH the photo and any typed answer, and point "
+                                "out anything in the sketch that is right or wrong.",
+                                photos,
+                                system="You are a Grade 12 math teacher who reads handwritten "
+                                "student work carefully.",
+                            )
+                        else:
+                            check = call_llm(
+                                grade_prompt,
+                                system="You are a Grade 12 math teacher.",
+                            )
                     st.markdown(check)
 
         st.divider()
