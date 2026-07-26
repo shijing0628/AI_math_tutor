@@ -22,6 +22,7 @@ from openai import OpenAI
 from PIL import Image
 
 from profile_store import load_profile, save_profile, supabase_enabled
+from image_attachments import clear_pending_images, set_pending_images
 from tutor_agent import build_tutor_agent as build_agent
 from tutor_graph import (
     build_tutor_graph,
@@ -855,6 +856,8 @@ def main():
                 with st.spinner("Starting agent..."):
                     st.session_state.agent_graph = build_agent(persistent=True)
                 st.session_state.agent_display = []
+            if "agent_display" not in st.session_state:
+                st.session_state.agent_display = []
             agent_graph = st.session_state.agent_graph
 
             # One durable conversation thread per student
@@ -864,34 +867,109 @@ def main():
                 }
             }
 
-            for msg in st.session_state.get("agent_display", []):
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-                    if msg.get("tools"):
-                        with st.expander("Tools used"):
-                            for line in msg["tools"]:
-                                st.code(line, language="text")
+            # ---- Conversation (always visible) ----
+            st.markdown("#### Conversation")
+            history = st.session_state.get("agent_display") or []
+            if not history:
+                st.info(
+                    "No messages yet. Type below, or attach a photo of your work, "
+                    "then chat with the tutor."
+                )
+            else:
+                for msg in history:
+                    with st.chat_message(msg["role"]):
+                        st.markdown(msg["content"])
+                        if msg.get("tools"):
+                            with st.expander("Tools used"):
+                                for line in msg["tools"]:
+                                    st.code(line, language="text")
+
+            # ---- Optional photo attachment (does not replace chat) ----
+            with st.expander("Optional: attach a photo of your work", expanded=False):
+                st.caption(
+                    "Can't type the math? Snap a photo of your handwriting or graph "
+                    "and the agent will read and grade it."
+                )
+                agent_photos = st.file_uploader(
+                    "Upload a photo (JPG/PNG, up to 3)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    accept_multiple_files=True,
+                    key="agent_photo_upload",
+                )
+                use_agent_cam = st.toggle("Use camera instead", key="agent_cam_toggle")
+                agent_cam = None
+                if use_agent_cam:
+                    agent_cam = st.camera_input("Take a photo", key="agent_cam_input")
+
+                pending_photos = list(agent_photos or [])
+                if agent_cam is not None:
+                    pending_photos.append(agent_cam)
+
+                send_photo = False
+                if pending_photos:
+                    cols = st.columns(min(len(pending_photos), 3))
+                    for col, photo in zip(cols, pending_photos[:3]):
+                        with col:
+                            st.image(photo, use_container_width=True)
+                    send_photo = st.button(
+                        f"Send {len(pending_photos)} photo(s) to the tutor",
+                        key="agent_send_photo",
+                    )
+                else:
+                    pending_photos = []
+                    send_photo = False
 
             agent_msg = st.chat_input("Talk to your tutor agent...")
+
+            # A turn happens on a typed message OR a photo-only send.
+            user_text = None
             if agent_msg:
+                user_text = agent_msg
+            elif send_photo:
+                user_text = "I uploaded a photo of my work. Please look at it and help me."
+
+            if user_text:
+                image_payload = [
+                    {"bytes": p.getvalue(), "mime": (p.type or "image/png")}
+                    for p in pending_photos[:3]
+                ]
+                display_text = user_text
+                if image_payload:
+                    display_text += f"\n\n_[{len(image_payload)} photo(s) attached]_"
                 st.session_state.agent_display.append(
-                    {"role": "user", "content": agent_msg}
+                    {"role": "user", "content": display_text}
                 )
                 with st.chat_message("user"):
-                    st.markdown(agent_msg)
+                    st.markdown(display_text)
+
+                # Give the agent a text hint plus the raw bytes via the holder,
+                # since tool-call arguments cannot carry image data themselves.
+                model_text = user_text
+                if image_payload:
+                    model_text += (
+                        f"\n\n[{len(image_payload)} photo(s) attached] "
+                        "Use review_student_photo to read them."
+                    )
+                    set_pending_images(image_payload)
+
                 with st.chat_message("assistant"):
                     with st.spinner("Agent is working (may call several tools)..."):
-                        result = agent_graph.invoke(
-                            {"messages": [{"role": "user", "content": agent_msg}]},
-                            config=agent_thread,
-                        )
+                        try:
+                            result = agent_graph.invoke(
+                                {"messages": [{"role": "user", "content": model_text}]},
+                                config=agent_thread,
+                            )
+                        finally:
+                            clear_pending_images()
                     messages = result.get("messages") or []
                     tool_lines = []
                     for m in messages:
                         for call in getattr(m, "tool_calls", None) or []:
                             name = call.get("name", "?")
                             args = call.get("args", {})
-                            tool_lines.append(f"{name}({json.dumps(args, ensure_ascii=False)[:160]})")
+                            tool_lines.append(
+                                f"{name}({json.dumps(args, ensure_ascii=False)[:160]})"
+                            )
                     last = messages[-1] if messages else None
                     reply = str(getattr(last, "content", "") or "")
                     st.markdown(reply)
@@ -904,6 +982,7 @@ def main():
                 )
                 # Progress may have changed via update_progress
                 st.session_state.profile = load_profile(PROFILE_FILE)
+                st.rerun()
 
             if st.session_state.get("agent_display") and st.button(
                 "Reset agent conversation"

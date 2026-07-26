@@ -21,6 +21,7 @@ from typing import Callable
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from image_attachments import get_pending_images
 from profile_store import load_profile, save_profile
 from textbook_index import search_chunks
 from tutor_graph import (
@@ -32,6 +33,10 @@ from tutor_graph import (
 )
 
 LLMFn = Callable[..., str]
+
+# Vision callable: (prompt, images, system=None) -> str, where images is a
+# list of {"bytes": <raw image bytes>, "mime": "image/png"} dicts.
+VisionFn = Callable[..., str]
 
 
 class EvaluationResult(BaseModel):
@@ -51,6 +56,7 @@ def build_tutor_tools(
     llm_fn: LLMFn,
     base_dir: Path | None = None,
     chat_model=None,
+    vision_fn: VisionFn | None = None,
 ) -> list:
     """
     Build the tool list bound to a concrete LLM callable.
@@ -60,6 +66,9 @@ def build_tutor_tools(
         base_dir: Project root (defaults to this package directory).
         chat_model: Optional LangChain chat model. When given, grading uses
             ``with_structured_output(EvaluationResult)`` for reliable JSON.
+        vision_fn: Optional callable ``vision_fn(prompt, images, system=None)``
+            that sends the pending photos to a vision model. When provided, the
+            ``review_student_photo`` tool is enabled.
     """
     root = Path(base_dir) if base_dir else BASE_DIR
     lesson_cache_file = root / "lesson_cache.json"
@@ -295,7 +304,81 @@ No markdown.
         save_profile(profile, profile_file)
         return message
 
-    return [
+    @tool
+    def review_student_photo(concept: str = "", quiz: str = "") -> str:
+        """
+        Read the student's most recently attached photo of handwritten math work
+        or a graph/diagram sketch. Use this whenever the student uploaded or took
+        a photo instead of typing their answer.
+
+        Behavior:
+        - If `quiz` text is given, grade the work in the photo against that quiz
+          and return JSON with mastery_score, feedback, and next_action (same
+          schema as grade_answer). Afterwards, call update_progress.
+        - If `quiz` is empty, return a plain-language transcription/summary of
+          what the student wrote or drew, so you can decide what to do next.
+        """
+        images = get_pending_images()
+        if not images:
+            return (
+                "No photo is attached. Ask the student to upload or take a photo "
+                "of their work, then try again."
+            )
+        if vision_fn is None:
+            return "Vision is not available in this configuration."
+
+        if quiz.strip():
+            prompt = f"""
+You are a Grade 12 mathematics teacher grading a photo of a student's work.
+First read the handwriting / diagram in the image(s) carefully, then grade it
+against the quiz below.
+
+Concept:
+{concept}
+
+Quiz:
+{quiz}
+
+Return JSON only (no markdown):
+{{
+  "mastery_score": 85,
+  "feedback": "What you saw in the photo and detailed feedback.",
+  "strengths": ["..."],
+  "weaknesses": ["..."],
+  "recommended_practice": ["..."],
+  "next_action": "mastered/practice/remediation"
+}}
+
+Scoring: 85-100 mastered, 60-84 practice, below 60 remediation.
+"""
+            raw = vision_fn(
+                prompt,
+                images,
+                system="You are a careful Grade 12 math grader reading photos of student work.",
+            )
+            try:
+                evaluation = EvaluationResult(**clean_json(raw))
+                return evaluation.model_dump_json(indent=2)
+            except Exception:
+                return EvaluationResult(
+                    mastery_score=0,
+                    feedback=raw,
+                    next_action="remediation",
+                ).model_dump_json(indent=2)
+
+        prompt = (
+            "Transcribe and summarize the student's handwritten math work or "
+            "sketch in the image(s). List each step or equation you can read, "
+            "and describe any diagram/graph. Do not grade yet; just report what "
+            "is on the paper as clearly as possible."
+        )
+        return vision_fn(
+            prompt,
+            images,
+            system="You read photos of Grade 12 math work and transcribe them faithfully.",
+        )
+
+    tools = [
         get_current_concept,
         list_roadmap_concepts,
         search_textbook,
@@ -304,3 +387,6 @@ No markdown.
         grade_answer,
         update_progress,
     ]
+    if vision_fn is not None:
+        tools.append(review_student_photo)
+    return tools

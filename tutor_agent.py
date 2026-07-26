@@ -12,6 +12,7 @@ thread_id, so a quiz started in one turn can be graded in a later turn
 
 from __future__ import annotations
 
+import base64
 import os
 import sqlite3
 from pathlib import Path
@@ -39,6 +40,7 @@ You have tools for:
 - making a quiz (cache-first)
 - grading an answer
 - updating student progress
+- reading a photo of the student's handwritten work or sketch (review_student_photo)
 
 Guidelines:
 1. Prefer tools over guessing. If the student asks what they should study,
@@ -54,8 +56,12 @@ Guidelines:
    - mastered: congratulate and suggest the next concept
    - practice: give focused follow-up practice on their weak points
    - remediation: re-teach the concept more simply
-6. Keep replies short, encouraging, and focused on Grade 12 math.
-7. Do not invent scores. Use grade_answer for scoring.
+6. When the student attaches a photo (you will see a note like
+   "[photo attached]"), call review_student_photo. If the photo answers a quiz
+   from earlier in the conversation, pass that quiz text so it is graded, then
+   call update_progress. Otherwise call it with no quiz to read the work first.
+7. Keep replies short, encouraging, and focused on Grade 12 math.
+8. Do not invent scores. Use grade_answer or review_student_photo for scoring.
 """
 
 
@@ -95,6 +101,47 @@ def make_openai_llm_fn(settings: dict[str, str] | None = None):
     return llm_fn
 
 
+def make_openai_vision_fn(settings: dict[str, str] | None = None):
+    """
+    Build a ``(prompt, images, system=None) -> str`` callable that sends photos
+    to the vision-capable chat model.
+
+    ``images`` is a list of ``{"bytes": b"...", "mime": "image/png"}`` dicts.
+    """
+    cfg = settings or load_azure_settings()
+    if not cfg["api_key"] or not cfg["endpoint"] or not cfg["model"]:
+        raise RuntimeError(
+            "Missing Azure settings. Set AZURE_OPENAI_API_KEY, "
+            "AZURE_ENDPOINT, and AZURE_MODEL in .env"
+        )
+
+    client = OpenAI(api_key=cfg["api_key"], base_url=cfg["endpoint"])
+    model = cfg["model"]
+
+    def vision_fn(prompt: str, images: list[dict], system: str | None = None) -> str:
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for img in (images or [])[:3]:
+            raw = img.get("bytes")
+            if not raw:
+                continue
+            mime = img.get("mime") or "image/png"
+            b64 = base64.b64encode(raw).decode("utf-8")
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime};base64,{b64}"},
+                }
+            )
+        messages: list[dict[str, Any]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": content})
+        response = client.chat.completions.create(model=model, messages=messages)
+        return response.choices[0].message.content or ""
+
+    return vision_fn
+
+
 def make_chat_model(settings: dict[str, str] | None = None) -> ChatOpenAI:
     """Chat model used by the ReAct agent for tool selection / replies."""
     cfg = settings or load_azure_settings()
@@ -129,8 +176,11 @@ def build_tutor_agent(base_dir: Path | None = None, persistent: bool = False):
     root = Path(base_dir) if base_dir else BASE_DIR
     settings = load_azure_settings()
     llm_fn = make_openai_llm_fn(settings)
+    vision_fn = make_openai_vision_fn(settings)
     model = make_chat_model(settings)
-    tools = build_tutor_tools(llm_fn, base_dir=root, chat_model=model)
+    tools = build_tutor_tools(
+        llm_fn, base_dir=root, chat_model=model, vision_fn=vision_fn
+    )
 
     checkpointer = None
     if persistent:
