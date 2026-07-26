@@ -22,6 +22,10 @@ logs.txt
 chat_history.json
 student_profile.json
 
+# Agent conversation checkpoints (local only)
+tutor_agent_memory.sqlite
+tutor_agent_memory.sqlite-*
+
 # OS
 .DS_Store
 Thumbs.db

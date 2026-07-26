@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 
+from profile_store import load_profile, save_profile, supabase_enabled
+from tutor_agent import build_tutor_agent as build_agent
 from tutor_graph import (
     build_tutor_graph,
     get_graph_values,
@@ -618,7 +620,7 @@ def apply_evaluation(profile: dict, concept: str, evaluation: dict) -> dict:
         if concept not in profile.setdefault("weak", []):
             profile["weak"].append(concept)
 
-    save_json(PROFILE_FILE, profile)
+    save_profile(profile, PROFILE_FILE)
     return profile
 
 
@@ -702,7 +704,7 @@ def ensure_quiz_ready(
 
 def init_session() -> None:
     if "profile" not in st.session_state:
-        st.session_state.profile = load_json(PROFILE_FILE, DEFAULT_PROFILE.copy())
+        st.session_state.profile = load_profile(PROFILE_FILE)
     if "roadmap" not in st.session_state:
         st.session_state.roadmap = load_json(ROADMAP_FILE, [])
     if "lesson_cache" not in st.session_state:
@@ -757,7 +759,7 @@ def main():
         name = st.text_input("Name", value=profile.get("student_name", "Tom"))
         if name != profile.get("student_name"):
             profile["student_name"] = name
-            save_json(PROFILE_FILE, profile)
+            save_profile(profile, PROFILE_FILE)
 
         concept_labels = [
             f"{i + 1}. {item.get('concept', 'Unknown')}" for i, item in enumerate(roadmap)
@@ -773,7 +775,7 @@ def main():
             )
             if selected != profile.get("current_index"):
                 profile["current_index"] = selected
-                save_json(PROFILE_FILE, profile)
+                save_profile(profile, PROFILE_FILE)
                 st.session_state.last_evaluation = None
                 st.session_state.graph_threads = {}
                 st.rerun()
@@ -830,9 +832,85 @@ def main():
     progress = (int(profile.get("current_index", 0)) + 1) / max(len(roadmap), 1)
     st.progress(min(progress, 1.0), text=f"Topic {profile.get('current_index', 0) + 1} of {len(roadmap)}")
 
-    tab_lesson, tab_chat, tab_quiz, tab_visual, tab_progress = st.tabs(
-        ["Lesson", "Ask Tutor", "Quiz", "Visual Question", "Progress"]
+    tab_agent, tab_lesson, tab_chat, tab_quiz, tab_visual, tab_progress = st.tabs(
+        ["AI Agent", "Lesson", "Ask Tutor", "Quiz", "Visual Question", "Progress"]
     )
+
+    # ---- AI Agent (autonomous tutor) ----
+    with tab_agent:
+        st.markdown("### Autonomous tutor agent")
+        st.caption(
+            "One chat does everything: the agent decides when to check your progress, "
+            "search the textbook, teach, quiz, grade, and save your results. "
+            "Try: \"What should I study?\" → \"Teach me\" → \"Quiz me\" → paste your answers."
+        )
+        if supabase_enabled():
+            st.caption("Cloud sync: progress is also saved to Supabase.")
+
+        agent_error = azure_config_error()
+        if agent_error:
+            st.error(agent_error)
+        else:
+            if "agent_graph" not in st.session_state:
+                with st.spinner("Starting agent..."):
+                    st.session_state.agent_graph = build_agent(persistent=True)
+                st.session_state.agent_display = []
+            agent_graph = st.session_state.agent_graph
+
+            # One durable conversation thread per student
+            agent_thread = {
+                "configurable": {
+                    "thread_id": f"agent:{profile.get('student_name', 'Student')}"
+                }
+            }
+
+            for msg in st.session_state.get("agent_display", []):
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+                    if msg.get("tools"):
+                        with st.expander("Tools used"):
+                            for line in msg["tools"]:
+                                st.code(line, language="text")
+
+            agent_msg = st.chat_input("Talk to your tutor agent...")
+            if agent_msg:
+                st.session_state.agent_display.append(
+                    {"role": "user", "content": agent_msg}
+                )
+                with st.chat_message("user"):
+                    st.markdown(agent_msg)
+                with st.chat_message("assistant"):
+                    with st.spinner("Agent is working (may call several tools)..."):
+                        result = agent_graph.invoke(
+                            {"messages": [{"role": "user", "content": agent_msg}]},
+                            config=agent_thread,
+                        )
+                    messages = result.get("messages") or []
+                    tool_lines = []
+                    for m in messages:
+                        for call in getattr(m, "tool_calls", None) or []:
+                            name = call.get("name", "?")
+                            args = call.get("args", {})
+                            tool_lines.append(f"{name}({json.dumps(args, ensure_ascii=False)[:160]})")
+                    last = messages[-1] if messages else None
+                    reply = str(getattr(last, "content", "") or "")
+                    st.markdown(reply)
+                    if tool_lines:
+                        with st.expander("Tools used"):
+                            for line in tool_lines[-8:]:
+                                st.code(line, language="text")
+                st.session_state.agent_display.append(
+                    {"role": "assistant", "content": reply, "tools": tool_lines[-8:]}
+                )
+                # Progress may have changed via update_progress
+                st.session_state.profile = load_profile(PROFILE_FILE)
+
+            if st.session_state.get("agent_display") and st.button(
+                "Reset agent conversation"
+            ):
+                st.session_state.agent_display = []
+                st.session_state.pop("agent_graph", None)
+                st.rerun()
 
     # ---- Lesson ----
     with tab_lesson:
@@ -1230,7 +1308,7 @@ Give supportive feedback and a short worked solution. Score out of 10.
             if concept not in profile.setdefault("completed", []):
                 profile["completed"].append(concept)
             profile["current_index"] = int(profile.get("current_index", 0)) + 1
-            save_json(PROFILE_FILE, profile)
+            save_profile(profile, PROFILE_FILE)
             st.session_state.profile = profile
             st.rerun()
 
